@@ -12,7 +12,7 @@ jobs:
   build:
     name: Build & Package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -31,10 +31,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install nuitka zstandard
           pip install -r requirements.txt
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            python -m pip install imageio
-          fi
-        shell: bash
 
       # ------------------------
       # Build (Windows)
@@ -65,10 +61,10 @@ jobs:
           --nofollow-import-to=PIL.IcoImagePlugin
           --nofollow-import-to=PIL.XpmImagePlugin
           --nofollow-import-to=PIL.FtexImagePlugin
-          --include-package-data=CTkMessagebox
-          --include-package-data=customtkinter
           --windows-icon-from-ico=icon.ico
           --lto=yes
+          --include-package-data=CTkMessagebox
+          --include-package-data=customtkinter
           monolith.py
 
       # ------------------------
@@ -78,7 +74,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          CMD="python -m nuitka \
+          python -m nuitka \
             --standalone \
             --onefile \
             --enable-plugin=tk-inter \
@@ -100,16 +96,8 @@ jobs:
             --nofollow-import-to=PIL.XpmImagePlugin \
             --nofollow-import-to=PIL.FtexImagePlugin \
             --include-package-data=CTkMessagebox \
-            --include-package-data=customtkinter"
-
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            CMD="$CMD --macos-create-app-bundle --macos-app-name=Monolith --macos-app-icon=icon.ico --macos-app-mode=gui"
-          fi
-
-          CMD="$CMD monolith.py"
-          echo "Running build command:"
-          echo $CMD
-          eval $CMD
+            --include-package-data=customtkinter \
+            monolith.py
 
       # ------------------------
       # Packaging
@@ -126,14 +114,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p packaged
-          tar -czvf packaged/Monolith-linux.tar.gz monolith
+          tar -czvf packaged/Monolith-linux.tar.gz monolith.bin
 
       - name: Package macOS DMG
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
           mkdir -p dmg/Monolith.app/Contents/MacOS
-          cp Monolith.app/Contents/MacOS/Monolith dmg/Monolith.app/Contents/MacOS/Monolith
+          cp monolith.bin dmg/Monolith.app/Contents/MacOS/Monolith
           chmod +x dmg/Monolith.app/Contents/MacOS/Monolith
           mkdir -p packaged
           hdiutil create -volname "Monolith" -srcfolder dmg -ov -format UDZO packaged/Monolith-macos.dmg
