@@ -5,11 +5,9 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
-
-env:
-  APP_VERSION: "1.0.5"
 
 jobs:
   build:
@@ -24,10 +22,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "APP_VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Bake version into source
+        shell: bash
+        run: |
+          echo "__version__ = \"${{ steps.version.outputs.APP_VERSION }}\"" > _version.py
 
       - name: Install dependencies
         run: |
@@ -35,9 +52,7 @@ jobs:
           pip install nuitka zstandard
           pip install -r requirements.txt
 
-      # ------------------------
       # Build (Windows)
-      # ------------------------
       - name: Build executable (Windows)
         if: matrix.os == 'windows-latest'
         shell: powershell
@@ -65,14 +80,14 @@ jobs:
             --nofollow-import-to=PIL.XpmImagePlugin `
             --nofollow-import-to=PIL.FtexImagePlugin `
             --windows-icon-from-ico=icon.ico `
+            --windows-product-version="${{ steps.version.outputs.APP_VERSION }}.0" `
+            --windows-file-version="${{ steps.version.outputs.APP_VERSION }}.0" `
             --lto=yes `
             --include-package-data=customtkinter `
             --output-dir=packaged `
             monolith.py
 
-      # ------------------------
       # Build (Linux & macOS)
-      # ------------------------
       - name: Build executable (Linux & macOS)
         if: matrix.os != 'windows-latest'
         shell: bash
@@ -99,13 +114,12 @@ jobs:
             --nofollow-import-to=PIL.IcoImagePlugin \
             --nofollow-import-to=PIL.XpmImagePlugin \
             --nofollow-import-to=PIL.FtexImagePlugin \
+            --lto=yes \
             --include-package-data=customtkinter \
             --output-dir=packaged \
             monolith.py
 
-      # ------------------------
       # Package Windows
-      # ------------------------
       - name: Package Windows ZIP
         if: matrix.os == 'windows-latest'
         shell: powershell
@@ -113,9 +127,7 @@ jobs:
           mkdir final-dist -Force
           Compress-Archive packaged/monolith.exe final-dist/Monolith-windows.zip -Force
 
-      # ------------------------
       # Package Linux
-      # ------------------------
       - name: Package Linux tar.gz
         if: matrix.os == 'ubuntu-latest'
         shell: bash
@@ -126,9 +138,7 @@ jobs:
           BIN_FILE="${BIN_FILE[0]}"
           tar -czvf final-dist/Monolith-linux.tar.gz -C packaged "$(basename "$BIN_FILE")"
 
-      # ------------------------
       # Package macOS (.app + DMG)
-      # ------------------------
       - name: Package macOS DMG
         if: matrix.os == 'macos-latest'
         shell: bash
@@ -136,6 +146,7 @@ jobs:
           set -e
 
           APP_NAME="Monolith"
+          APP_VERSION="${{ steps.version.outputs.APP_VERSION }}"
           APP_DIR="dmg/${APP_NAME}.app"
           ICONSET="icon.iconset"
 
@@ -146,7 +157,16 @@ jobs:
           cp "$BIN_FILE" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
           chmod +x "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 
-          sips -s format png icon.ico --out icon.png
+          sips -s format png icon.ico --out icon.png || true
+          if [ ! -f icon.png ]; then
+            # Fallback: create a plain placeholder if sips conversion failed
+            python3 -c "
+          from PIL import Image
+          img = Image.new('RGBA', (512, 512), (26, 26, 46, 255))
+          img.save('icon.png')
+          "
+          fi
+
           mkdir -p "${ICONSET}"
           for SIZE in 16 32 64 128 256 512; do
             sips -z $SIZE $SIZE icon.png --out "${ICONSET}/icon_${SIZE}x${SIZE}.png"
@@ -194,9 +214,7 @@ jobs:
             -fs HFS+ \
             final-dist/Monolith-macos.dmg
 
-      # ------------------------
       # Upload artifacts
-      # ------------------------
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -211,6 +229,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read version
+        id: version
+        run: echo "APP_VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
@@ -219,16 +241,11 @@ jobs:
       - name: Create GitHub release
         shell: bash
         run: |
-          TAG="v${{ env.APP_VERSION }}"
-
-          gh release delete "$TAG" --yes || true
-
-          # Delete tag if it already exists (ignore failure)
-          git push origin --delete "$TAG" || true
+          TAG="v${{ steps.version.outputs.APP_VERSION }}"
 
           gh release create "$TAG" release-assets/* \
             --title "Release $TAG" \
-            --notes "Automated build for version ${{ env.APP_VERSION }}"
+            --notes "Automated build for version ${{ steps.version.outputs.APP_VERSION }}" \
+            --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

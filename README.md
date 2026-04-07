@@ -8,7 +8,9 @@ A modern graphical mod management tool for
 
 Monolith provides an all-in-one solution to manage PK3 mods, download mods on the fly, profiles, launch parameters, and RCON connections from a single interface.
 
-![Monolith Screenshot](https://i.ibb.co/vvcgbshF/monolith.png)
+![MM-Tab Screenshot](https://i.ibb.co/nqR5NCdD/1.png)
+![DM-Tab Screenshot](https://i.ibb.co/SXsS2HqL/2.png)
+![RCON-Tab Screenshot](https://i.ibb.co/GQDZyh5b/3.png)
 
 ---
 
@@ -53,6 +55,7 @@ Monolith provides an all-in-one solution to manage PK3 mods, download mods on th
 - Context menus
 - Status indicators
 - Export mod lists to JSON
+- In-App Updater
 
 ---
 
@@ -92,9 +95,14 @@ Monolith provides an all-in-one solution to manage PK3 mods, download mods on th
 ## Configuration and Log Locations
 - Monolith will on first launch copy all the legacy config files and logs from the JK2ModManager folder into
   the created monolith folder and use that instead
-- The JK2ModManager will be automatically deleted after migration
+- The old JK2ModManager folder will be automatically deleted after migration
 ```
 Windows: %APPDATA%\monolith\
 Linux:   ~/.config/monolith/\
 macOS:   ~/Library/Application Support/monolith/
 ```
+
+---
+
+## License
+Distributed under the MIT License. See `LICENSE` for more information.
