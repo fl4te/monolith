@@ -71,8 +71,9 @@ def get_dpi_scaling() -> float:
                     wintypes.POINT(0, 0), 1
                 )
                 dpi_x = ctypes.c_uint()
+                dpi_y = ctypes.c_uint()
                 ctypes.windll.shcore.GetDpiForMonitor(
-                    monitor, 0, ctypes.byref(dpi_x), None
+                    monitor, 0, ctypes.byref(dpi_x), ctypes.byref(dpi_y)
                 )
                 scaling = dpi_x.value / 96.0
             except Exception as e:
@@ -2026,11 +2027,13 @@ def _safe_extract_zip(zf: zipfile.ZipFile, dest: Path) -> None:
 
 
 if __name__ == "__main__":
-    scaling = get_dpi_scaling()
-    ctk.set_widget_scaling(scaling)
-    ctk.set_window_scaling(scaling)
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("dark-blue")
+
+    if os.name != "nt":
+        scaling = get_dpi_scaling()
+        ctk.set_widget_scaling(scaling)
+        ctk.set_window_scaling(scaling)
 
     app = MonolithApp()
     app.check_incomplete_update()
